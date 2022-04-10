@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.32328.378
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kevast", "Kevast\Kevast.csproj", "{66401FCD-B710-4754-9D0F-3B6ECA37AA80}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kevast.Temp", "Kevast.Temp\Kevast.Temp.csproj", "{FA32E742-C025-42D3-8EF6-7DD63C65DDE7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{66401FCD-B710-4754-9D0F-3B6ECA37AA80}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{66401FCD-B710-4754-9D0F-3B6ECA37AA80}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{66401FCD-B710-4754-9D0F-3B6ECA37AA80}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{66401FCD-B710-4754-9D0F-3B6ECA37AA80}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FA32E742-C025-42D3-8EF6-7DD63C65DDE7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FA32E742-C025-42D3-8EF6-7DD63C65DDE7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FA32E742-C025-42D3-8EF6-7DD63C65DDE7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FA32E742-C025-42D3-8EF6-7DD63C65DDE7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D9C00D1D-3B95-4AAA-9FDE-9A7723D22680}
+	EndGlobalSection
+EndGlobal
