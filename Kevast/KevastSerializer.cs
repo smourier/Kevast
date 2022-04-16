@@ -123,7 +123,7 @@ namespace Kevast
             return IsBlittableCache(type);
         }
 
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, bool> _isBlittable = new System.Collections.Concurrent.ConcurrentDictionary<Type, bool>();
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, bool> _isBlittable = new();
 
         private static bool IsBlittableCache(Type type)
         {

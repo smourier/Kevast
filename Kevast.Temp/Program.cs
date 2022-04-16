@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Net.Http;
 
 namespace Kevast.Temp
 {
@@ -7,6 +8,12 @@ namespace Kevast.Temp
     {
         static void Main(string[] args)
         {
+            using (var kv = new KevastServer("http://localhost:5002/api/"))
+            {
+                kv.Start();
+                Console.ReadLine();
+            }
+            return;
             var dic = new KevastDictionary<string, object>();
 
             var sw = new Stopwatch();
@@ -26,6 +33,24 @@ namespace Kevast.Temp
             Console.WriteLine(dic.Count);
             dic.Save("test.bin");
             Console.WriteLine(sw.Elapsed);
+        }
+
+        static void OopMain()
+        {
+            var client = new HttpClient();
+            // internal dictionary API
+            client.PostAsync("http://localhost:5002/api/[internal]/set/[dictionary]/[key]", null);
+            client.GetAsync("http://localhost:5002/api/[internal]/get/[dictionary]/[key]");
+            client.DeleteAsync("http://localhost:5002/api/[internal]/del/[dictionary]/[key]");
+
+            // server API
+            client.PostAsync("http://localhost:5002/api/server/connect/[server]", null);
+            client.GetAsync("http://localhost:5002/api/server");
+
+            // dictionary API
+            client.PostAsync("http://localhost:5002/api/set/[dictionary]/[key]", null);
+            client.GetAsync("http://localhost:5002/api/get/[dictionary]/[key]");
+            client.DeleteAsync("http://localhost:5002/api/del/[dictionary]/[key]");
         }
     }
 }

@@ -9,6 +9,8 @@ using System.Threading;
 
 namespace Kevast
 {
+    // ripped from dotnet source
+
     /// <summary>Represents a thread-safe collection of keys and values.</summary>
     /// <typeparam name="TKey">The type of the keys in the dictionary.</typeparam>
     /// <typeparam name="TValue">The type of the values in the dictionary.</typeparam>
@@ -2256,7 +2258,7 @@ namespace Kevast
 
             internal DictionaryEnumerator(KevastDictionary<TKey, TValue> dictionary) => _enumerator = dictionary.GetEnumerator();
 
-            public DictionaryEntry Entry => new DictionaryEntry(_enumerator.Current.Key, _enumerator.Current.Value);
+            public DictionaryEntry Entry => new(_enumerator.Current.Key, _enumerator.Current.Value);
 
             public object Key => _enumerator.Current.Key;
 
