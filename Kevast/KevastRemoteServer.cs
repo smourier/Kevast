@@ -14,10 +14,12 @@ namespace Kevast
                 throw new ArgumentNullException(nameof(baseUri));
 
             BaseUri = baseUri;
+            State = KevastRemoteServerState.Disconnected;
         }
 
         public Uri BaseUri { get; }
         public Guid Id { get; set; }
+        public KevastRemoteServerState State { get; set; }
 
         public override string ToString() => BaseUri.ToString();
         int IComparable.CompareTo(object? obj) => CompareTo(obj as KevastRemoteServer);

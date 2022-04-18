@@ -9,8 +9,10 @@ namespace Kevast.Temp
         static void Main(string[] args)
         {
             using (var kv = new KevastServer("http://localhost:5002/api/"))
+            //using (var kv2 = new KevastServer("http://localhost:5003/api/"))
             {
                 kv.Start();
+                //kv2.Start();
                 Console.ReadLine();
             }
             return;
