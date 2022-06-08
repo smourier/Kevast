@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
+using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -169,6 +171,12 @@ namespace Kevast
             return context.Response.OutputStream.WriteAsync(_false);
         }
 
+        private class Dic
+        {
+            public string Name;
+            public int Count;
+        }
+
         protected override async Task<HttpStatusCode> HandleRequestAsync(HttpListenerContext context, string[] segments)
         {
             if (context == null)
@@ -178,10 +186,10 @@ namespace Kevast
                 throw new ArgumentNullException(nameof(segments));
 
             if (segments.Length == 0)
-                throw new ArgumentException(null, nameof(segments));
+                return HttpStatusCode.BadRequest;
 
             if (context.Request.Url == null)
-                throw new ArgumentException(null, nameof(context));
+                return HttpStatusCode.BadRequest;
 
             Interlocked.Increment(ref _totalCountOfRequests);
             Stream os;
@@ -193,6 +201,28 @@ namespace Kevast
             switch (segments[0])
             {
                 case "set":
+                    // /set/[dictionary]?key=value
+                    if (context.Request.HttpMethod == "GET" && segments.Length == 2)
+                    {
+                        os = context.Response.OutputStream;
+                        if (!_dictionaries.TryGetValue(segments[1], out dic))
+                        {
+                            dic = new KevastDictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                            dic = _dictionaries.AddOrUpdate(segments[1], dic, (k, o) => o);
+                        }
+
+                        var qs = context.Request.QueryString;
+                        foreach (var k in qs.AllKeys)
+                        {
+                            if (k == null)
+                                continue;
+
+                            dic[k] = qs[k];
+                        }
+                        os.Dispose();
+                        return HttpStatusCode.OK;
+                    }
+
                     if (context.Request.HttpMethod != "POST")
                         return HttpStatusCode.BadRequest;
 
@@ -257,10 +287,33 @@ namespace Kevast
                     return HttpStatusCode.OK;
 
                 case "del":
+                    var result = false;
+                    if (context.Request.HttpMethod == "GET" && segments.Length == 2)
+                    {
+                        os = context.Response.OutputStream;
+                        if (_dictionaries.TryGetValue(segments[1], out dic))
+                        {
+                            result = true;
+                            var qs = context.Request.QueryString;
+                            foreach (var k in qs.AllKeys)
+                            {
+                                if (k == null)
+                                    continue;
+
+                                if (!dic.TryRemove(k, out _))
+                                {
+                                    result = false;
+                                }
+                            }
+                        }
+                        await WriteBooleanJson(context, result).ConfigureAwait(false);
+                        os.Dispose();
+                        return HttpStatusCode.OK;
+                    }
+
                     if (segments.Length < 1 || context.Request.HttpMethod != "DELETE")
                         return HttpStatusCode.BadRequest;
 
-                    var result = false;
                     if (segments.Length == 1)
                     {
                         // note this is slightly incorrect (race condition, no lock)
@@ -296,29 +349,30 @@ namespace Kevast
                     name = segments[1];
                     switch (name)
                     {
-                        case "status":
+                        case "get":
                             if (context.Request.HttpMethod != "GET")
                                 return HttpStatusCode.BadRequest;
 
+                            if (segments.Length != 2)
+                                return HttpStatusCode.BadRequest;
+
+                            var dictionaries = _dictionaries.Select(d => new { Name = d.Key, d.Value.Count });
                             os = context.Response.OutputStream;
                             context.Response.ContentType = "application/json";
-                            if (segments.Length == 2)
+                            var server = new
                             {
-                                var server = new
-                                {
-                                    dictionariesCount = _dictionaries.Count,
-                                    DateTimeOffset.UtcNow,
-                                    StartTimeUtc,
-                                    totalCountOfRequests = _totalCountOfRequests,
-                                    TotalCountOfItems,
-                                    RemoteServers,
-                                };
-                                await JsonSerializer.SerializeAsync(os, server, _jsonSerializerOptions).ConfigureAwait(false);
-                            }
+                                DateTimeOffset.UtcNow,
+                                StartTimeUtc,
+                                totalCountOfRequests = _totalCountOfRequests,
+                                TotalCountOfItems,
+                                RemoteServers,
+                                dictionaries,
+                            };
+                            await JsonSerializer.SerializeAsync(os, server, _jsonSerializerOptions).ConfigureAwait(false);
                             os.Dispose();
                             return HttpStatusCode.OK;
 
-                        case "connect":
+                        case "set":
                             if (context.Request.HttpMethod != "POST")
                                 return HttpStatusCode.BadRequest;
 
@@ -336,7 +390,7 @@ namespace Kevast
                             os.Dispose();
                             return HttpStatusCode.OK;
 
-                        case "disconnect":
+                        case "del":
                             if (context.Request.HttpMethod != "DELETE")
                                 return HttpStatusCode.BadRequest;
 

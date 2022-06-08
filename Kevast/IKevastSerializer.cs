@@ -5,6 +5,6 @@ namespace Kevast
     public interface IKevastSerializer
     {
         public void Write(Stream stream, object? value);
-        public object? Read(Stream stream);
+        public bool TryRead(Stream stream, out object? value);
     }
 }

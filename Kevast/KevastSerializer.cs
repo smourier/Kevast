@@ -33,6 +33,7 @@ namespace Kevast
             DateTime_Local,
 
             Decimal_0,
+            Decimal,
 
             Byte,
             SByte,
@@ -53,29 +54,9 @@ namespace Kevast
 
             Enumerable,
             Dictionary,
-
-            ArrayOfBooleans,
-            ArrayOfBytes,
-            ArrayOfSBytes,
-            ArrayOfDBNulls,
-            ArrayOfChars,
-            ArrayOfInt16,
-            ArrayOfInt32,
-            ArrayOfInt64,
-            ArrayOfUInt16,
-            ArrayOfUInt32,
-            ArrayOfUInt64,
-            ArrayOfDoubles,
-            ArrayOfSingles,
-            ArrayOfDecimals,
-            ArrayOfDateTimes,
-            ArrayOfGuids,
-            ArrayOfTimeSpans,
-            ArrayOfDateTimeOffsets,
-            ArrayOfIntPtr,
-            ArrayOfUIntPtr,
-            ArrayOfStrings,
             Array,
+
+            Custom,
         }
 
         public KevastSerializer(KevastPersistenceOptions? options)
@@ -84,6 +65,7 @@ namespace Kevast
         }
 
         public KevastPersistenceOptions? Options { get; }
+        public virtual Encoding StringEncoding => Encoding.UTF8;
 
         protected virtual bool IsBlittableType(Type type)
         {
@@ -157,12 +139,341 @@ namespace Kevast
             }
         }
 
-        public virtual object? Read(Stream stream)
+        private Encoding GetStringEncoding()
+        {
+            var enc = StringEncoding;
+            if (enc == null)
+                throw new InvalidOperationException(nameof(StringEncoding) + " property cannot be null.");
+
+            return enc;
+        }
+
+        public virtual bool TryRead(Stream stream, out object? value)
         {
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
 
-            return null;
+            var i = stream.ReadByte();
+            if (i < 0)
+            {
+                value = null;
+                return false;
+            }
+
+            var code = (Code)i;
+            switch (code)
+            {
+                case Code.Empty:
+                case Code.DbNull:
+                case Code.String_Null:
+                    value = null;
+                    return true;
+
+                case Code.True:
+                    value = true;
+                    return true;
+
+                case Code.False:
+                    value = false;
+                    return true;
+
+                case Code.Int32_0:
+                    value = 0;
+                    return true;
+
+                case Code.Int32_P1:
+                    value = 1;
+                    return true;
+
+                case Code.Int32_M1:
+                    value = -1;
+                    return true;
+
+                case Code.Int32:
+                    Span<byte> i32 = stackalloc byte[4];
+                    if (stream.Read(i32) != 4)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = BitConverter.ToInt32(i32);
+                    return true;
+
+                case Code.String_Empty:
+                    value = string.Empty;
+                    return true;
+
+                case Code.String_Length_8:
+                    var sb8 = stream.ReadByte();
+                    if (sb8 < 0)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    Span<byte> s8 = stackalloc byte[sb8];
+                    if (stream.Read(s8) != sb8)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = GetStringEncoding().GetString(s8);
+                    return true;
+
+                case Code.String_Length_16:
+                    var sb16 = stream.ReadByte();
+                    if (sb16 < 0)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    Span<byte> s16 = stackalloc byte[sb16];
+                    if (stream.Read(s16) != sb16)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = GetStringEncoding().GetString(s16);
+                    return true;
+
+                case Code.String_Length_32:
+                    var sb32 = stream.ReadByte();
+                    if (sb32 < 0)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    Span<byte> s32 = stackalloc byte[sb32];
+                    if (stream.Read(s32) != sb32)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = GetStringEncoding().GetString(s32);
+                    return true;
+
+                case Code.Guid:
+                    Span<byte> gb = stackalloc byte[16];
+                    if (stream.Read(gb) != 16)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = new Guid(gb);
+                    return true;
+
+                case Code.UInt32:
+                    Span<byte> ui32 = stackalloc byte[4];
+                    if (stream.Read(ui32) != 4)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = BitConverter.ToUInt32(ui32);
+                    return true;
+
+                case Code.Int64:
+                    Span<byte> i64 = stackalloc byte[8];
+                    if (stream.Read(i64) != 8)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = BitConverter.ToInt64(i64);
+                    return true;
+
+                case Code.UInt64:
+                    Span<byte> ui64 = stackalloc byte[8];
+                    if (stream.Read(ui64) != 8)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = BitConverter.ToUInt64(ui64);
+                    return true;
+
+                case Code.Single:
+                    Span<byte> single = stackalloc byte[4];
+                    if (stream.Read(single) != 4)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = BitConverter.ToSingle(single);
+                    return true;
+
+                case Code.Double:
+                    Span<byte> dbl = stackalloc byte[8];
+                    if (stream.Read(dbl) != 8)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = BitConverter.ToDouble(dbl);
+                    return true;
+
+                case Code.Char:
+                    Span<byte> c = stackalloc byte[2];
+                    if (stream.Read(c) != 2)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = BitConverter.ToChar(c);
+                    return true;
+
+                case Code.DateTime_Local:
+                    Span<byte> dtl = stackalloc byte[8];
+                    if (stream.Read(dtl) != 8)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = new DateTime(BitConverter.ToInt64(dtl), DateTimeKind.Local);
+                    return true;
+
+                case Code.DateTime_Utc:
+                    Span<byte> utc = stackalloc byte[8];
+                    if (stream.Read(utc) != 8)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = new DateTime(BitConverter.ToInt64(utc), DateTimeKind.Utc);
+                    return true;
+
+                case Code.DateTime_Unspecified:
+                    Span<byte> dtu = stackalloc byte[8];
+                    if (stream.Read(dtu) != 8)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = new DateTime(BitConverter.ToInt64(dtu), DateTimeKind.Unspecified);
+                    return true;
+
+                case Code.DateTimeOffset:
+                    Span<byte> dto = stackalloc byte[16];
+                    if (stream.Read(dto) != 16)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = new DateTimeOffset(BitConverter.ToInt64(dto), new TimeSpan(BitConverter.ToInt64(dto.Slice(8))));
+                    return true;
+
+                case Code.TimeSpan:
+                    Span<byte> ts = stackalloc byte[8];
+                    if (stream.Read(ts) != 8)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = new TimeSpan(BitConverter.ToInt64(ts));
+                    return true;
+
+                case Code.Decimal_0:
+                    value = 0m;
+                    return true;
+
+                case Code.Decimal:
+                    Span<int> dec = stackalloc int[4];
+                    if (stream.Read(MemoryMarshal.AsBytes(dec)) != 4 * 4)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = new decimal(dec);
+                    return true;
+
+                case Code.SByte:
+                    var sb = stream.ReadByte();
+                    if (sb < 0)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = (sbyte)sb;
+                    return true;
+
+                case Code.Byte:
+                    var b = stream.ReadByte();
+                    if (b < 0)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = (byte)b;
+                    return true;
+
+                case Code.Int16:
+                    Span<byte> i16 = stackalloc byte[2];
+                    if (stream.Read(i16) != 2)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = BitConverter.ToInt16(i16);
+                    return true;
+
+                case Code.UInt16:
+                    Span<byte> ui16 = stackalloc byte[2];
+                    if (stream.Read(ui16) != 2)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = BitConverter.ToUInt16(ui16);
+                    return true;
+
+                case Code.IntPtr:
+                    Span<byte> ip = stackalloc byte[8];
+                    if (stream.Read(ip) != 8)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = (IntPtr)BitConverter.ToInt64(ip);
+                    return true;
+
+                case Code.UIntPtr:
+                    Span<byte> uip = stackalloc byte[8];
+                    if (stream.Read(uip) != 8)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = (UIntPtr)BitConverter.ToInt64(uip);
+                    return true;
+            }
+
+            value = null;
+            return false;
         }
 
         public virtual void Write(Stream stream, object? value)
@@ -277,6 +588,7 @@ namespace Kevast
 
                     Span<int> span = stackalloc int[4];
                     decimal.GetBits(dec, span);
+                    writeCode(Code.Decimal);
                     writeBytesSpan<int>(span);
                     return;
 
@@ -314,7 +626,7 @@ namespace Kevast
                         return;
                     }
 
-                    bytes = Encoding.Unicode.GetBytes(str);
+                    bytes = GetStringEncoding().GetBytes(str);
                     if (bytes.Length < 0x100)
                     {
                         writeCode(Code.String_Length_8);
@@ -386,85 +698,18 @@ namespace Kevast
 
                     if (type.IsArray)
                     {
-                        var et = type.GetElementType();
-                        if (et != null)
-                        {
-                            var etc = Type.GetTypeCode(et);
-                            switch (etc)
-                            {
-                                case TypeCode.DBNull:
-                                    writeCode(Code.ArrayOfDBNulls);
-                                    break;
-
-                                case TypeCode.Boolean:
-                                    writeCode(Code.ArrayOfBooleans);
-                                    break;
-
-                                case TypeCode.Char:
-                                    writeCode(Code.ArrayOfChars);
-                                    break;
-
-                                case TypeCode.SByte:
-                                    writeCode(Code.ArrayOfSBytes);
-                                    break;
-
-                                case TypeCode.Byte:
-                                    writeCode(Code.ArrayOfBytes);
-                                    break;
-
-                                case TypeCode.Int16:
-                                    writeCode(Code.ArrayOfInt16);
-                                    break;
-
-                                case TypeCode.UInt16:
-                                    writeCode(Code.ArrayOfUInt16);
-                                    break;
-
-                                case TypeCode.Int32:
-                                    writeCode(Code.ArrayOfInt32);
-                                    break;
-
-                                case TypeCode.UInt32:
-                                    writeCode(Code.ArrayOfUInt32);
-                                    break;
-
-                                case TypeCode.Int64:
-                                    writeCode(Code.ArrayOfInt64);
-                                    break;
-
-                                case TypeCode.UInt64:
-                                    writeCode(Code.ArrayOfUInt64);
-                                    break;
-
-                                case TypeCode.Single:
-                                    writeCode(Code.ArrayOfSingles);
-                                    break;
-
-                                case TypeCode.Double:
-                                    writeCode(Code.ArrayOfDoubles);
-                                    break;
-                                
-                                case TypeCode.Decimal:
-                                    writeCode(Code.ArrayOfDecimals);
-                                    break;
-
-                                case TypeCode.DateTime:
-                                    writeCode(Code.ArrayOfDateTimes);
-                                    break;
-
-                                case TypeCode.String:
-                                    writeCode(Code.ArrayOfStrings);
-                                    break;
-
-                                default:
-                                    break;
-                            }
-                        }
+                        writeCode(Code.Array);
+                        return;
                     }
-                    else if (type is IEnumerable enumerable)
+
+                    if (type is IEnumerable enumerable)
                     {
                         writeCode(Code.Enumerable);
                         return;
+                    }
+
+                    if (IsBlittable(type))
+                    {
                     }
 
                     break;

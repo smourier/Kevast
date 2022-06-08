@@ -6,6 +6,6 @@ namespace Kevast
     public interface IKevastAsyncSerializer
     {
         public Task WriteAsync(Stream stream, object? value);
-        public Task<object?> ReadAsync(Stream stream);
+        public Task<bool> TryReadAsync(Stream stream, out object? value);
     }
 }

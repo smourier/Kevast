@@ -76,7 +76,7 @@ namespace Kevast.Utilities
             }
             var segments = context.Request.Url.Segments.Skip(PathSegments.Length).Select(s => normSeg(s)).ToArray();
 
-            EventProvider.Default.LogInfo("Segments: " + string.Join(string.Empty, segments));
+            EventProvider.Default.LogInfo("Segments: " + string.Join("/", segments));
             try
             {
                 var code = await HandleRequestAsync(context, segments).ConfigureAwait(false);

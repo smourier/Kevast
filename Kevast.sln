@@ -7,7 +7,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kevast", "Kevast\Kevast.csp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kevast.Temp", "Kevast.Temp\Kevast.Temp.csproj", "{FA32E742-C025-42D3-8EF6-7DD63C65DDE7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kevast.Perf", "Kevast.Perf\Kevast.Perf.csproj", "{51E9C9CD-C1B9-46D7-A171-00B2C59A9CD0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kevast.Perf", "Kevast.Perf\Kevast.Perf.csproj", "{51E9C9CD-C1B9-46D7-A171-00B2C59A9CD0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kevast.Server", "Kevast.Server\Kevast.Server.csproj", "{7E13EF62-F6C7-4958-92E9-901746F35F69}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -27,6 +29,10 @@ Global
 		{51E9C9CD-C1B9-46D7-A171-00B2C59A9CD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{51E9C9CD-C1B9-46D7-A171-00B2C59A9CD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{51E9C9CD-C1B9-46D7-A171-00B2C59A9CD0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E13EF62-F6C7-4958-92E9-901746F35F69}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E13EF62-F6C7-4958-92E9-901746F35F69}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E13EF62-F6C7-4958-92E9-901746F35F69}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E13EF62-F6C7-4958-92E9-901746F35F69}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

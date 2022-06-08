@@ -1,27 +1,13 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
+using Kevast.Utilities;
 
 namespace Kevast
 {
     public partial class KevastDictionary<TKey, TValue>
     {
-        private static readonly byte[] _signature = new byte[] { 0xDE, 0xAD, 0xC0, 0x01 };
-
-        private Node[] CopyToNodes()
-        {
-            var locksAcquired = 0;
-            try
-            {
-                AcquireAllLocks(ref locksAcquired);
-                var nodes = new Node[_tables._buckets.Length];
-                Array.Copy(_tables._buckets, nodes, nodes.Length);
-                return nodes;
-            }
-            finally
-            {
-                ReleaseLocks(0, locksAcquired);
-            }
-        }
+        private static readonly byte[] _signatureV1 = new byte[] { 0x4B, 0x56, 0x53, 0x31 }; // "KVS1"
 
         public static KevastDictionary<TKey, TValue> Load(string filePath, KevastPersistenceOptions? options = null)
         {
@@ -37,17 +23,32 @@ namespace Kevast
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
 
-            options ??= new KevastPersistenceOptions();
+            var sig = new byte[4];
+            var dic = new KevastDictionary<TKey, TValue>();
+            if (stream.Read(sig, 0, sig.Length) == sig.Length)
+            {
+                if (sig.SequenceEqual(_signatureV1))
+                {
+                    var serializer = options?.Serializer ?? new KevastSerializer(options);
+                    do
+                    {
+                        if (!serializer.TryRead<TKey>(stream, out var key) || key == null || !serializer.TryRead<TValue>(stream, out var value))
+                            break;
 
-            return new KevastDictionary<TKey, TValue>();
+                        dic[key] = value!;
+                    }
+                    while (true);
+                }
+            }
+            return dic;
         }
 
-        public virtual void Save(string filePath, KevastPersistenceOptions? options = null)
+        public void Save(string filePath, KevastPersistenceOptions? options = null)
         {
             if (filePath == null)
                 throw new ArgumentNullException(nameof(filePath));
 
-            using var file = File.OpenWrite(filePath);
+            using var file = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
             Save(file, options);
         }
 
@@ -57,17 +58,13 @@ namespace Kevast
                 throw new ArgumentNullException(nameof(stream));
 
             var serializer = options?.Serializer ?? new KevastSerializer(options);
-            stream.Write(_signature, 0, 4);
-            var nodes = CopyToNodes();
-            foreach (var node in nodes)
+            stream.Write(_signatureV1);
+            var kvs = ToArray();
+            foreach (var kv in kvs)
             {
-                if (node == null)
-                    continue;
-
-                serializer.Write(stream, node._key);
-                serializer.Write(stream, node._value);
+                serializer.Write(stream, kv.Key);
+                serializer.Write(stream, kv.Value);
             }
-            stream.Write(_signature, 0, 4);
         }
     }
 }
