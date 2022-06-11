@@ -171,12 +171,6 @@ namespace Kevast
             return context.Response.OutputStream.WriteAsync(_false);
         }
 
-        private class Dic
-        {
-            public string Name;
-            public int Count;
-        }
-
         protected override async Task<HttpStatusCode> HandleRequestAsync(HttpListenerContext context, string[] segments)
         {
             if (context == null)
