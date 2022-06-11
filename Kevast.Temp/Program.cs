@@ -1,8 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Net.Http;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Kevast.Utilities;
 
 namespace Kevast.Temp
 {
@@ -69,19 +73,32 @@ namespace Kevast.Temp
 
         static void SaveAndLoad()
         {
-            var dic = new KevastDictionary<string, object>();
-            //for (var i = 0; i < 10000; i++)
-            //{
-            //    dic["héllo" + i] = "hallo" + i;
-            //}
-            dic["dec"] = 1234567890m;
-            dic["dtu"] = DateTime.UtcNow;
+            var t = new Test { Code = 0x12345678, Stuff = 567 };
+            var vv = Conversions.GetBytes(t);
 
-            dic["struct"] = new Test { Code = 123, Stuff = 567 };
+            var ks = new KevastSerializer();
+            var ms = new MemoryStream();
 
-            dic.Save("sal.bin");
+            var dic = new Dictionary<string, object>();
+            dic["toto"] = 1234;
+            dic["titi"] = 21320;
 
-            var dic2 = KevastDictionary<string, object>.Load("sal.bin");
+            var l = new List<object>();
+            l.Add("toto");
+            l.Add("titi");
+            l.Add(dic);
+
+            ks.Write(ms, l);
+
+            Console.WriteLine(Conversions.ToHexaDump(ms.ToArray()));
+
+            ms.Position = 0;
+            //var r = ks.TryRead<Test>(ms, out var v);
+            //Console.WriteLine("ret:" + r + " v:" + v?.Length);
+            //Console.WriteLine("ret:" + r + " t:" + v.Code.ToHex());
+
+            var dic2 = ks.TryRead<object>(ms, out var v);
+            Console.WriteLine(v);
         }
 
         static void OopMain()

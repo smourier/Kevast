@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -83,6 +84,136 @@ namespace Kevast.Utilities
                     }
                 }
             }
+        }
+
+        private static bool TryReadStruct<T>(byte[] bytes, out object? value) where T : struct
+        {
+            if (!MemoryMarshal.TryRead<T>(bytes, out var tvalue))
+            {
+                value = default;
+                return false;
+            }
+
+            value = tvalue;
+            return true;
+        }
+
+        public static bool TryGetStruct(Type type, byte[] bytes, out object? value)
+        {
+            if (type == null)
+                throw new ArgumentNullException(nameof(type));
+
+            if (bytes == null)
+                throw new ArgumentNullException(nameof(bytes));
+
+            var method = typeof(Conversions).GetMethod(nameof(TryReadStruct), BindingFlags.Static | BindingFlags.NonPublic);
+            var gmethod = method!.MakeGenericMethod(type);
+            var parameters = new object[2];
+            parameters[0] = bytes;
+            var b = (bool)gmethod.Invoke(null, parameters)!;
+            value = parameters[1];
+            return b;
+        }
+
+        private static byte[] GetByteArray<T>(T value) where T : struct => MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref value, 1)).ToArray();
+        public static byte[] GetBytes(object value)
+        {
+            var method = typeof(Conversions).GetMethod(nameof(GetByteArray), BindingFlags.Static | BindingFlags.NonPublic);
+            var gmethod = method!.MakeGenericMethod(value.GetType());
+            return (byte[])gmethod.Invoke(null, new object[] { value })!;
+        }
+
+        public static string? ToHexaDump(string text, Encoding? encoding = null)
+        {
+            if (text == null)
+                return null;
+
+            encoding ??= Encoding.Unicode;
+            return ToHexaDump(encoding.GetBytes(text));
+        }
+
+        public static string? ToHexaDump(this byte[] bytes, string? prefix = null)
+        {
+            if (bytes == null)
+                return null;
+
+            return ToHexaDump(bytes, 0, bytes.Length, prefix, true);
+        }
+
+        public static string? ToHexaDump(this IntPtr ptr, int count) => ToHexaDump(ptr, 0, count);
+        public static string? ToHexaDump(this IntPtr ptr, int offset, int count, string? prefix = null, bool addHeader = true)
+        {
+            if (ptr == IntPtr.Zero)
+                return null;
+
+            var bytes = new byte[count];
+            Marshal.Copy(ptr, bytes, offset, count);
+            return ToHexaDump(bytes, 0, count, prefix, addHeader);
+        }
+
+        public static string? ToHexaDump(this byte[] bytes, int count) => ToHexaDump(bytes, 0, count);
+        public static string? ToHexaDump(this byte[] bytes, int offset, int count, string? prefix = null, bool addHeader = true)
+        {
+            if (bytes == null)
+                return null;
+
+            if (offset < 0)
+            {
+                offset = 0;
+            }
+
+            if (count < 0)
+            {
+                count = bytes.Length;
+            }
+
+            if ((offset + count) > bytes.Length)
+            {
+                count = bytes.Length - offset;
+            }
+
+            var sb = new StringBuilder();
+            if (addHeader)
+            {
+                sb.Append(prefix);
+                //             0         1         2         3         4         5         6         7
+                //             01234567890123456789012345678901234567890123456789012345678901234567890123456789
+                sb.AppendLine("Offset    00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F  0123456789ABCDEF");
+                sb.AppendLine("--------  -----------------------------------------------  ----------------");
+            }
+
+            for (var i = 0; i < count; i += 16)
+            {
+                sb.Append(prefix);
+                sb.AppendFormat("{0:X8}  ", i + offset);
+
+                int j;
+                for (j = 0; (j < 16) && ((i + j) < count); j++)
+                {
+                    sb.AppendFormat("{0:X2} ", bytes[i + j + offset]);
+                }
+
+                sb.Append(" ");
+                if (j < 16)
+                {
+                    sb.Append(new string(' ', 3 * (16 - j)));
+                }
+                for (j = 0; j < 16 && (i + j) < count; j++)
+                {
+                    var b = bytes[i + j + offset];
+                    if (b > 31 && b < 128)
+                    {
+                        sb.Append((char)b);
+                    }
+                    else
+                    {
+                        sb.Append('.');
+                    }
+                }
+
+                sb.AppendLine();
+            }
+            return sb.ToString();
         }
 
         public static string Wrap(this string input, int length, string? strictSeparator = null, Func<char, bool>? breakFunc = null) => string.Join(Environment.NewLine, WrapToLines(input, length, strictSeparator, breakFunc));
@@ -318,7 +449,7 @@ namespace Kevast.Utilities
                 {
                     t = t.Substring(1);
                 }
-            
+
                 t = t.Nullify();
                 if (t == null)
                     continue;

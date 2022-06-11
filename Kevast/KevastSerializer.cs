@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using Kevast.Utilities;
 
 namespace Kevast
 {
@@ -20,7 +22,9 @@ namespace Kevast
             Int32_0,
             Int32_P1,
             Int32_M1,
-            Int32,
+            Int32_8Bits,
+            Int32_16Bits,
+            Int32_32Bits,
 
             String_Null,
             String_Empty,
@@ -46,6 +50,7 @@ namespace Kevast
             Single,
             Double,
 
+            Guid_Empty,
             Guid,
             TimeSpan,
             DateTimeOffset,
@@ -53,13 +58,17 @@ namespace Kevast
             UIntPtr,
 
             Enumerable,
+            Terminator,
+            List,
+            Dictionary_String_Object,
             Dictionary,
-            Array,
+            Rank1Array,
+            ByteArray,
 
-            Custom,
+            Blittable,
         }
 
-        public KevastSerializer(KevastPersistenceOptions? options)
+        public KevastSerializer(KevastPersistenceOptions? options = null)
         {
             Options = options;
         }
@@ -160,13 +169,19 @@ namespace Kevast
                 return false;
             }
 
+            int len;
             var code = (Code)i;
             switch (code)
             {
                 case Code.Empty:
+                case Code.Null:
                 case Code.DbNull:
                 case Code.String_Null:
                     value = null;
+                    return true;
+
+                case Code.Terminator:
+                    value = code;
                     return true;
 
                 case Code.True:
@@ -189,7 +204,7 @@ namespace Kevast
                     value = -1;
                     return true;
 
-                case Code.Int32:
+                case Code.Int32_32Bits:
                     Span<byte> i32 = stackalloc byte[4];
                     if (stream.Read(i32) != 4)
                     {
@@ -198,6 +213,28 @@ namespace Kevast
                     }
 
                     value = BitConverter.ToInt32(i32);
+                    return true;
+
+                case Code.Int32_16Bits:
+                    Span<byte> i32_16 = stackalloc byte[2];
+                    if (stream.Read(i32_16) != 2)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = (int)BitConverter.ToInt16(i32_16);
+                    return true;
+
+                case Code.Int32_8Bits:
+                    var i32_8 = stream.ReadByte();
+                    if (i32_8 < 0)
+                    {
+                        value = null;
+                        return false;
+                    }
+
+                    value = (int)(sbyte)i32_8;
                     return true;
 
                 case Code.String_Empty:
@@ -256,6 +293,10 @@ namespace Kevast
                     }
 
                     value = GetStringEncoding().GetString(s32);
+                    return true;
+
+                case Code.Guid_Empty:
+                    value = Guid.Empty;
                     return true;
 
                 case Code.Guid:
@@ -470,6 +511,139 @@ namespace Kevast
 
                     value = (UIntPtr)BitConverter.ToInt64(uip);
                     return true;
+
+                case Code.Enumerable:
+                    var enumList = new List<object?>();
+                    do
+                    {
+                        if (!TryRead(stream, out var evalue))
+                        {
+                            value = null;
+                            return false;
+                        }
+
+                        if (Code.Terminator.Equals(evalue))
+                        {
+                            value = enumList;
+                            return true;
+                        }
+
+                        enumList.Add(evalue);
+                    }
+                    while (true);
+
+                case Code.List:
+                    if (this.TryRead(stream, out len))
+                    {
+                        var list = new List<object?>(len);
+                        for (var li = 0; li < len; li++)
+                        {
+                            if (!TryRead(stream, out var item))
+                            {
+                                value = null;
+                                return false;
+                            }
+
+                            list.Add(item);
+                        }
+
+                        value = list;
+                        return true;
+                    }
+                    break;
+
+                case Code.Dictionary:
+                    if (this.TryRead(stream, out len))
+                    {
+                        var dic = new Dictionary<object, object?>(len);
+                        for (var li = 0; li < len; li++)
+                        {
+                            if (!TryRead(stream, out var itemKey) || itemKey == null)
+                            {
+                                value = null;
+                                return false;
+                            }
+
+                            if (!TryRead(stream, out var itemValue))
+                            {
+                                value = null;
+                                return false;
+                            }
+
+                            dic[itemKey] = itemValue;
+                        }
+
+                        value = dic;
+                        return true;
+                    }
+                    break;
+
+                case Code.Dictionary_String_Object:
+                    if (this.TryRead(stream, out len))
+                    {
+                        var dic = new Dictionary<string, object?>(len);
+                        for (var li = 0; li < len; li++)
+                        {
+                            if (!this.TryRead<string>(stream, out var itemKey) || itemKey == null)
+                            {
+                                value = null;
+                                return false;
+                            }
+
+                            if (!TryRead(stream, out var itemValue))
+                            {
+                                value = null;
+                                return false;
+                            }
+
+                            dic[itemKey] = itemValue;
+                        }
+
+                        value = dic;
+                        return true;
+                    }
+                    break;
+
+                case Code.Rank1Array:
+                    if (this.TryRead(stream, out len))
+                    {
+                        var list = new object?[len];
+                        for (var li = 0; li < len; li++)
+                        {
+                            if (!TryRead(stream, out var item))
+                            {
+                                value = null;
+                                return false;
+                            }
+
+                            list[li] = item;
+                        }
+
+                        value = list;
+                        return true;
+                    }
+                    break;
+
+                case Code.ByteArray:
+                    if (this.TryRead(stream, out len))
+                    {
+                        var bytes = new byte[len];
+                        if (stream.Read(bytes) == len)
+                        {
+                            value = bytes;
+                            return true;
+                        }
+                    }
+                    break;
+
+                case Code.Blittable:
+                    if (this.TryRead<string>(stream, out var typeName) && typeName != null)
+                    {
+                        var type = Type.GetType(typeName, false);
+                        if (type != null && this.TryRead<byte[]>(stream, out var bytes) && bytes != null)
+                            return Conversions.TryGetStruct(type, bytes, out value);
+                    }
+                    break;
             }
 
             value = null;
@@ -511,12 +685,12 @@ namespace Kevast
 
                 case TypeCode.SByte:
                     writeCode(Code.SByte);
-                    writeByte((byte)value);
+                    writeSByte((sbyte)value);
                     return;
 
                 case TypeCode.Byte:
                     writeCode(Code.Byte);
-                    writeSByte((sbyte)value);
+                    writeByte((byte)value);
                     return;
 
                 case TypeCode.Int16:
@@ -549,7 +723,21 @@ namespace Kevast
                         return;
                     }
 
-                    writeCode(Code.Int32);
+                    if (i32 >= sbyte.MinValue && i32 <= sbyte.MaxValue)
+                    {
+                        writeCode(Code.Int32_8Bits);
+                        writeSByte((sbyte)(int)value);
+                        return;
+                    }
+
+                    if (i32 >= short.MinValue && i32 <= short.MaxValue)
+                    {
+                        writeCode(Code.Int32_16Bits);
+                        writeInt16((short)(int)value);
+                        return;
+                    }
+
+                    writeCode(Code.Int32_32Bits);
                     writeInt32((int)value);
                     return;
 
@@ -627,7 +815,7 @@ namespace Kevast
                     }
 
                     bytes = GetStringEncoding().GetBytes(str);
-                    if (bytes.Length < 0x100)
+                    if (bytes.Length <= byte.MaxValue)
                     {
                         writeCode(Code.String_Length_8);
                         writeByte((byte)bytes.Length);
@@ -635,7 +823,7 @@ namespace Kevast
                         return;
                     }
 
-                    if (bytes.Length < 0x10000)
+                    if (bytes.Length <= ushort.MaxValue)
                     {
                         writeCode(Code.String_Length_16);
                         writeUInt16((ushort)bytes.Length);
@@ -651,9 +839,24 @@ namespace Kevast
                 default:
                     if (type == typeof(Guid))
                     {
-                        writeCode(Code.Guid);
                         var guid = (Guid)value;
+                        if (guid == Guid.Empty)
+                        {
+                            writeCode(Code.Guid_Empty);
+                            return;
+                        }
+
+                        writeCode(Code.Guid);
                         writeBytes(guid.ToByteArray());
+                        return;
+                    }
+
+                    if (type == typeof(byte[]))
+                    {
+                        writeCode(Code.ByteArray);
+                        var byteArray = (byte[])value;
+                        Write(stream, byteArray.Length);
+                        writeBytes(byteArray);
                         return;
                     }
 
@@ -690,26 +893,71 @@ namespace Kevast
                         return;
                     }
 
-                    if (type is IDictionary dictionary)
+                    if (value is IDictionary dictionary)
                     {
-                        writeCode(Code.Dictionary);
+                        if (dictionary is IReadOnlyDictionary<string, object> || dictionary is IDictionary<string, object>)
+                        {
+                            writeCode(Code.Dictionary_String_Object);
+                        }
+                        else
+                        {
+                            writeCode(Code.Dictionary);
+                        }
+                        Write(stream, dictionary.Count);
+                        foreach (DictionaryEntry kv in dictionary)
+                        {
+                            Write(stream, kv.Key);
+                            Write(stream, kv.Value);
+                        }
+                        return;
+                    }
+
+                    if (value is IList list)
+                    {
+                        writeCode(Code.List);
+                        Write(stream, list.Count);
+                        foreach (var item in list)
+                        {
+                            Write(stream, item);
+                        }
                         return;
                     }
 
                     if (type.IsArray)
                     {
-                        writeCode(Code.Array);
-                        return;
+                        var l = new List<string>();
+                        var array = (Array)value;
+                        if (array.Rank == 1)
+                        {
+                            writeCode(Code.Rank1Array);
+                            Write(stream, array.Length);
+                            for (var i = 0; i < array.Length; i++)
+                            {
+                                Write(stream, array.GetValue(i));
+                            }
+                            return;
+                        }
+                        break;
                     }
 
-                    if (type is IEnumerable enumerable)
+                    if (value is IEnumerable enumerable)
                     {
                         writeCode(Code.Enumerable);
+                        foreach (var item in enumerable)
+                        {
+                            Write(stream, item);
+                        }
+                        writeCode(Code.Terminator);
                         return;
                     }
 
                     if (IsBlittable(type))
                     {
+                        writeCode(Code.Blittable);
+                        Write(stream, type.AssemblyQualifiedName);
+                        var blit = Conversions.GetBytes(value);
+                        Write(stream, blit);
+                        return;
                     }
 
                     break;
@@ -728,7 +976,7 @@ namespace Kevast
             void writeDouble(double value) => stream.Write(BitConverter.GetBytes(value));
             void writeSingle(float value) => stream.Write(BitConverter.GetBytes(value));
             void writeCode(Code code) => writeByte((byte)code);
-            void writeBytes(byte[] bytes) => stream.Write(bytes);
+            void writeBytes(ReadOnlySpan<byte> bytes) => stream.Write(bytes);
             void writeBytesSpan<T>(ReadOnlySpan<T> span) where T : struct => stream.Write(MemoryMarshal.AsBytes<T>(span));
 
             throw new NotSupportedException("Value '" + value + "' of type '" + value.GetType().FullName + "' is not supported.");
